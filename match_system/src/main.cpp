@@ -72,33 +72,51 @@ class Pool
                 cout << "ERROR: " << tx.what() << endl;
             }
         }
-
+        bool check_user(uint32_t i, uint32_t j)
+        {
+            auto a = users[i], b = users[j];
+            int dt = abs(a.score - b.score);
+            int a_max_dif = wt[i] * 50 , b_max_dif = wt[j] * 50;
+         //   cout << a_max_dif << " " << b_max_dif << endl;
+            return dt <= a_max_dif && dt <= b_max_dif;
+        }
         void match()
         {
+            for(uint32_t i = 0 ; i < wt.size() ; i ++)
+                wt[i] ++;
+            cout << "+++++" << endl;
             while (users.size() > 1)
             {
                 bool flag = true;
-                sort(users.begin(), users.end(), [&](User &a, User &b){
-                        return a.score < b.score;
-                        });
-                for(uint32_t i = 1 ; i < users.size() ; i ++)
+                for(uint32_t i = 0 ; i < users.size() ; i ++)
                 {
-                    auto a = users[i - 1], b = users[i];
-                    if(b.score - a.score <= 100)
+                    for(uint32_t j = i + 1 ; j < users.size() ; j ++)
                     {
-                        flag = false;
-                        save_result(a.id, b.id);
-                        users.erase(users.begin() + i - 1);
-                        users.erase(users.begin() + i - 1);
+                        auto a = users[i], b = users[j];
+                        if(check_user(i, j))
+                        {
+                            users.erase(users.begin() + j);
+                            users.erase(users.begin() + i);
+                            wt.erase(wt.begin() + j);
+                            wt.erase(wt.begin() + i);
+                            save_result(a.id, b.id);
+                            flag = false;
+                            break;
+                        }
                     }
+                        
+                    if(!flag)break;
+
                 }
+
                 if(flag)break;
-            }
+           }
         }
 
         void add(User user)
         {
             users.push_back(user);
+            wt.push_back(0);
         }
 
         void remove(User user)
@@ -107,12 +125,15 @@ class Pool
                 if (users[i].id == user.id)
                 {
                     users.erase(users.begin() + i);
+                    wt.erase(wt.begin() + i);
                     break;
                 }
         }
 
     private:
         vector<User> users;
+        vector<int> wt;
+
 }pool;
 
 
@@ -157,6 +178,7 @@ void consume_task()
             //message_queue.cv.wait(lck);
             lck.unlock();
             pool.match();
+            cout << "-----" << endl;
             sleep(1);
         }
         else
@@ -164,11 +186,10 @@ void consume_task()
             auto task = message_queue.q.front();
             message_queue.q.pop();
             lck.unlock();
-
+            cout << "else" << endl;
             if (task.type == "add") pool.add(task.user);
             else if (task.type == "remove") pool.remove(task.user);
 
-            pool.match();
         }
     }
 }
